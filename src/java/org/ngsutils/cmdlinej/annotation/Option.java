@@ -11,10 +11,11 @@ public @interface Option {
 	String desc() default "";
 
 	String charName() default "";
-	String longName() default "";
+	String name() default "";
 
 	String defaultValue() default "";
-	boolean defaultNull() default false;
+	boolean required() default false;
 	
 	boolean hide() default false;
+	boolean showHelp() default false;
 }

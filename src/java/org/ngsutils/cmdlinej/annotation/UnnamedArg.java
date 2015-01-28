@@ -10,5 +10,5 @@ import java.lang.annotation.Target;
 public @interface UnnamedArg {
 	String name() default "ARGS";
 	String defaultValue() default "";
-	boolean defaultNull() default false;
+	boolean required() default false;
 }

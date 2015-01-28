@@ -140,12 +140,12 @@ public class MainBuilder {
 		Collections.sort(cats);
 
 		for (String cat : cats) {
+            ps.println("");
             ps.println("[" + cat + "]");
 			Collections.sort(progs.get(cat));
 			for (String line : progs.get(cat)) {
 				ps.println(line);
 			}
-            ps.println("");
 		}
 
 //		spacer = "";
@@ -160,13 +160,14 @@ public class MainBuilder {
 //                + "Display licenses");
 		
         if (hasExperimental) {
-        	ps.println("");
+        	ps.println();
         	ps.println("* = experimental command");
         }
         if (version != null) {
-        	ps.println("");
+        	ps.println();
         	ps.println(version);
         }
+    	ps.println();
 	}
 
 	public void showCommandHelp(String cmd) throws MissingCommandException {
@@ -190,7 +191,7 @@ public class MainBuilder {
 		for (Method m: execs.get(cmd).getMethods()) {
 			UnnamedArg uarg = m.getAnnotation(UnnamedArg.class);
 			if (uarg != null) {
-				ps.print(uarg.name());
+				ps.print(" "+uarg.name());
 			}
 		}
 		ps.println();
@@ -203,8 +204,8 @@ public class MainBuilder {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
 				String k = "";
-				if (!opt.longName().equals("")) {
-					k = opt.longName();
+				if (!opt.name().equals("")) {
+					k = opt.name();
 					if (!opt.charName().equals("")) {
 						k += " -"+opt.charName();
 					}
@@ -243,37 +244,34 @@ public class MainBuilder {
 			ps.println();
 			ps.println(version);
 		}
+    	ps.println();
 	}
 
 	public void findAndRun(String[] args) throws Exception {
 		Exec exec = null;
+		List<String> errors = new ArrayList<String>();
 		
-//		System.err.println("Looking for cmd: "+args[0]);
 		if (!execs.containsKey(args[0])) {
 			throw new MissingCommandException();
 		}
 		
-		CmdArgs cmdargs = extractArgs(args); 
-//		for (String k:cmdargs.cmdargs.keySet()) {
-//			System.err.println("cmdarg "+k+" => "+cmdargs.cmdargs.get(k));
-//		}
-//		if (cmdargs.unnamed != null) {
-//			for (String unnamed: cmdargs.unnamed) {
-//				System.err.println("unnamed => "+unnamed);
-//			}
-//		}
 		
 		Class<? extends Exec> clazz = execs.get(args[0]);
 		exec = clazz.newInstance();
+		CmdArgs cmdargs = extractArgs(args, clazz); 
 
 		for (Method m: clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
+				if (opt.showHelp()) {
+					showCommandHelp(args[0]);
+					System.exit(1);
+				}
 				String val = null;
 				if (cmdargs.cmdargs.containsKey(opt.charName())) {
 					val = cmdargs.cmdargs.get(opt.charName());
-				} else if (cmdargs.cmdargs.containsKey(opt.longName())) {
-					val = cmdargs.cmdargs.get(opt.longName());
+				} else if (cmdargs.cmdargs.containsKey(opt.name())) {
+					val = cmdargs.cmdargs.get(opt.name());
 				} else {
 					if (m.getName().startsWith("set")) {
 						String k = m.getName().substring(3).toLowerCase();
@@ -286,8 +284,8 @@ public class MainBuilder {
 				
 				if (val == null) {
 					// missing value, try defaults
-					if (opt.defaultNull()) {
-						invokeMethod(exec, m, null);
+					if (opt.required()) {
+						errors.add("Missing argument: "+opt.name());
 					} else if (!opt.defaultValue().equals("")) {
 						invokeMethod(exec, m, opt.defaultValue());
 					}
@@ -303,7 +301,14 @@ public class MainBuilder {
 			UnnamedArg unnamed = m.getAnnotation(UnnamedArg.class);
 			if (unnamed != null) {
 				if (cmdargs.unnamed == null) {
-					throw new CommandArgumentException(m, "");
+					if (unnamed.required()) {
+						errors.add("Missing argument: "+unnamed.name());
+					} else if (!unnamed.defaultValue().equals("")) {
+						invokeMethod(exec, m, unnamed.defaultValue());
+					} else {
+						throw new CommandArgumentException(m, "");
+					}
+					continue;
 				}
 
 				if (m.getParameterTypes()[0].isArray()) {					
@@ -316,10 +321,33 @@ public class MainBuilder {
 				}
 			}
 		}
-		exec.exec();
+		
+		if (errors.size() == 0) {
+			exec.exec();
+		} else {
+			for (String error: errors) {
+				System.err.println(error);
+				System.err.println();
+				showCommandHelp(args[0]);
+				System.exit(1);
+			}
+		}
 	}
 
-	private CmdArgs extractArgs(String[] args) {
+	private boolean isOptionBoolean(Class<?> clazz, String name) {
+		for (Method m:clazz.getMethods()) {
+			Option opt = m.getAnnotation(Option.class);
+			if (opt != null && (opt.name().equals(name) || opt.charName().equals(name))) {
+				Class<?> param = m.getParameterTypes()[0];
+				if (param.equals(Boolean.class) || param.equals(Boolean.TYPE)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	private CmdArgs extractArgs(String[] args, Class<?> clazz) {
 		Map<String, String> cmdargs = new HashMap<String, String>();
 		List<String> unnamed = null;
 		
@@ -333,7 +361,7 @@ public class MainBuilder {
 			}
 			if (arg.startsWith("--")) {
 				if (i+1 < args.length) {
-					if (args[i+1].startsWith("-")) {
+					if (args[i+1].startsWith("-") || isOptionBoolean(clazz, arg.substring(2))) {
 						cmdargs.put(arg.substring(2), "");
 						i += 1;
 						continue;
@@ -349,7 +377,7 @@ public class MainBuilder {
 			} else if (arg.startsWith("-")) {
 				for (int j=1; j<arg.length(); j++) {
 					if (j == arg.length()-1) {
-						if (args[i+1].startsWith("-")) {
+						if (args.length == i+1 || args[i+1].startsWith("-") || isOptionBoolean(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), "");
 							i += 1;
 							continue;
@@ -387,16 +415,20 @@ public class MainBuilder {
 		} else if (param.equals(Double.class) || param.equals(Double.TYPE)) {
 			m.invoke(obj, Double.parseDouble(val));
 		} else {
-			throw new CommandArgumentException(m, param.getName(), param.getClass());
+			throw new CommandArgumentException(m, param.getName(), param.getClass(), val );
 		}
 	}
 
 	public void invokeMethodBoolean(Object obj, Method m, boolean val) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, CommandArgumentException {
-		Class<?> param = m.getParameterTypes()[0];
-		if (param.equals(Boolean.class) || param.equals(Boolean.TYPE)) {
-			m.invoke(obj, val);
+		if (m.getParameterTypes().length == 0) {
+			m.invoke(obj);
 		} else {
-			throw new CommandArgumentException(m, "");
+			Class<?> param = m.getParameterTypes()[0];
+			if (param.equals(Boolean.class) || param.equals(Boolean.TYPE)) {
+				m.invoke(obj, val);
+			} else {
+				throw new CommandArgumentException(m, "");
+			}
 		}
 	}
 

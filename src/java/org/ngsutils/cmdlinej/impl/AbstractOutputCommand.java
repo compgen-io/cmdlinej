@@ -11,7 +11,7 @@ import org.ngsutils.cmdlinej.annotation.Option;
 public abstract class AbstractOutputCommand extends AbstractCommand {
     protected OutputStream out = System.out;
 
-    @Option(desc="Output filename (optionally gzip/bzip2 compressed) (default: stdout)", charName="o", defaultValue="-", longName="output")
+    @Option(desc="Output filename (optionally gzip/bzip2 compressed) (default: stdout)", charName="o", defaultValue="-", name="output")
     public void setOutputName(String outputName) throws IOException {
         if (outputName.equals("-")) {
             out = System.out;

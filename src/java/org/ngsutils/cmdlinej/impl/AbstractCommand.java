@@ -10,4 +10,6 @@ public abstract class AbstractCommand implements Exec {
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
+    @Option(desc = "Show help", charName = "h")
+    public void showHelp() {}
 }

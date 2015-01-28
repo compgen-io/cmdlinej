@@ -13,7 +13,7 @@ public class Foo implements Exec {
 	private boolean verbose=false;
 	private boolean shouldBeFalse=false;
 	
-	@Option(longName="str", charName="s", desc="String option", defaultValue="defstr")
+	@Option(name="str", charName="s", desc="String option", defaultValue="defstr")
 	public void setString(String s) {
 		this.s = s;
 	}
@@ -33,7 +33,7 @@ public class Foo implements Exec {
 		this.shouldBeFalse = v;
 	}
 
-	@Option(longName="int", desc="Integer option")
+	@Option(name="int", desc="Integer option")
 	public void setIntObj(Integer i) {
 		this.intObj = i;
 	}

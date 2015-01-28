@@ -2,12 +2,12 @@ package org.ngsutils.cmdlinej.test1;
 
 import java.util.List;
 
-import org.ngsutils.cmdlinej.Exec;
 import org.ngsutils.cmdlinej.annotation.Command;
 import org.ngsutils.cmdlinej.annotation.UnnamedArg;
+import org.ngsutils.cmdlinej.impl.AbstractCommand;
 
 @Command(name="baz", desc="Baz description", category="baz")
-public class Baz implements Exec {
+public class Baz extends AbstractCommand {
 	private List<String> s=null;
 	
 	@UnnamedArg()

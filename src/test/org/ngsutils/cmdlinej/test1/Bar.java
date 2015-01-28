@@ -19,7 +19,7 @@ public class Bar implements Exec {
 		this.arg = s;
 	}
 
-	@Option(longName="str", desc="String option")
+	@Option(name="str", desc="String option")
 	public void setString(String s) {
 		this.s = s;
 	}
@@ -39,7 +39,7 @@ public class Bar implements Exec {
 		this.shouldBeFalse = v;
 	}
 
-	@Option(longName="int", desc="Integer option")
+	@Option(name="int", desc="Integer option")
 	public void setIntObj(Integer i) {
 		this.intObj = i;
 	}
