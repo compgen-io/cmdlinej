@@ -186,6 +186,10 @@ public class MainBuilder {
 		if (!command.desc().equals("")) {
 			ps.print(" - " + command.desc());
 		}
+		if (!command.doc().equals("")) {
+			ps.println();
+			ps.print(command.doc());
+		}
 		ps.println();
 		ps.print("Usage:" + (progname == null ? "" : " " +progname )+ " "+ command.name() + " [options]");
 		for (Method m: execs.get(cmd).getMethods()) {
