@@ -1,4 +1,10 @@
-package org.ngsutils.cmdlinej;
+package io.compgen;
+
+import io.compgen.annotation.Command;
+import io.compgen.annotation.Option;
+import io.compgen.annotation.UnnamedArg;
+import io.compgen.exceptions.CommandArgumentException;
+import io.compgen.exceptions.MissingCommandException;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -11,12 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
-import org.ngsutils.cmdlinej.annotation.Command;
-import org.ngsutils.cmdlinej.annotation.Option;
-import org.ngsutils.cmdlinej.annotation.UnnamedArg;
-import org.ngsutils.cmdlinej.exceptions.CommandArgumentException;
-import org.ngsutils.cmdlinej.exceptions.MissingCommandException;
 
 public class MainBuilder {
 	public class CmdArgs {
@@ -309,8 +309,6 @@ public class MainBuilder {
 						errors.add("Missing argument: "+unnamed.name());
 					} else if (!unnamed.defaultValue().equals("")) {
 						invokeMethod(exec, m, unnamed.defaultValue());
-					} else {
-						throw new CommandArgumentException(m, "");
 					}
 					continue;
 				}
@@ -327,7 +325,14 @@ public class MainBuilder {
 		}
 		
 		if (errors.size() == 0) {
-			exec.exec();
+			try {
+				exec.exec();
+			} catch (CommandArgumentException e) {
+				System.err.println("ERROR: " + e.getMessage());
+				System.err.println();
+				showCommandHelp(args[0]);
+				System.exit(1);
+			}
 		} else {
 			for (String error: errors) {
 				System.err.println(error);

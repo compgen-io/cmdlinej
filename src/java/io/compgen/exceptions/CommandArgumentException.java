@@ -1,4 +1,4 @@
-package org.ngsutils.cmdlinej.exceptions;
+package io.compgen.exceptions;
 
 import java.lang.reflect.Method;
 
@@ -23,6 +23,14 @@ public class CommandArgumentException extends Exception {
 		this.value = null;
 		this.clazz = null;
 		this.name = name;
+	}
+
+	public CommandArgumentException(String str) {
+		super(str);
+		this.method = null;
+		this.value = null;
+		this.clazz = null;
+		this.name = null;
 	}
 
 	/**

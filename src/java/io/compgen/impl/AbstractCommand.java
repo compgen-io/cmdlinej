@@ -1,7 +1,7 @@
-package org.ngsutils.cmdlinej.impl;
+package io.compgen.impl;
 
-import org.ngsutils.cmdlinej.Exec;
-import org.ngsutils.cmdlinej.annotation.Option;
+import io.compgen.Exec;
+import io.compgen.annotation.Option;
 
 public abstract class AbstractCommand implements Exec {
     protected boolean verbose = false;

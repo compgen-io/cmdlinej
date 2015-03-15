@@ -1,12 +1,12 @@
 package org.ngsutils.cmdlinej.test1;
 
 import static org.junit.Assert.fail;
+import io.compgen.MainBuilder;
+import io.compgen.exceptions.MissingCommandException;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.ngsutils.cmdlinej.MainBuilder;
-import org.ngsutils.cmdlinej.exceptions.MissingCommandException;
 
 public class TestDocs {
 

@@ -1,8 +1,8 @@
 package org.ngsutils.cmdlinej.test1;
 
-import org.ngsutils.cmdlinej.Exec;
-import org.ngsutils.cmdlinej.annotation.Command;
-import org.ngsutils.cmdlinej.annotation.Option;
+import io.compgen.Exec;
+import io.compgen.annotation.Command;
+import io.compgen.annotation.Option;
 
 @Command(name="foo")
 public class Foo implements Exec {

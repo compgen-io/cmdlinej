@@ -1,8 +1,8 @@
 package org.ngsutils.cmdlinej.test1;
 
-import org.ngsutils.cmdlinej.Exec;
-import org.ngsutils.cmdlinej.annotation.Command;
-import org.ngsutils.cmdlinej.annotation.UnnamedArg;
+import io.compgen.Exec;
+import io.compgen.annotation.Command;
+import io.compgen.annotation.UnnamedArg;
 
 @Command(name="baz2", desc="Baz2 description", category="baz")
 public class Baz2 implements Exec {

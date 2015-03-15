@@ -1,10 +1,10 @@
 package org.ngsutils.cmdlinej.test1;
 
-import java.util.List;
+import io.compgen.annotation.Command;
+import io.compgen.annotation.UnnamedArg;
+import io.compgen.impl.AbstractCommand;
 
-import org.ngsutils.cmdlinej.annotation.Command;
-import org.ngsutils.cmdlinej.annotation.UnnamedArg;
-import org.ngsutils.cmdlinej.impl.AbstractCommand;
+import java.util.List;
 
 @Command(name="baz", desc="Baz description", category="baz")
 public class Baz extends AbstractCommand {

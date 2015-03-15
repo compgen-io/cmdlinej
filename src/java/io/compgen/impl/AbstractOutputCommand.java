@@ -1,4 +1,6 @@
-package org.ngsutils.cmdlinej.impl;
+package io.compgen.impl;
+
+import io.compgen.annotation.Option;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
@@ -6,12 +8,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.ngsutils.cmdlinej.annotation.Option;
-
 public abstract class AbstractOutputCommand extends AbstractCommand {
     protected OutputStream out = System.out;
 
-    @Option(desc="Output filename (optionally gzip/bzip2 compressed) (default: stdout)", charName="o", defaultValue="-", name="output")
+    @Option(desc="Output filename (optionally gzip/bzip2 compressed)", charName="o", defaultValue="-", name="output")
     public void setOutputName(String outputName) throws IOException {
         if (outputName.equals("-")) {
             out = System.out;

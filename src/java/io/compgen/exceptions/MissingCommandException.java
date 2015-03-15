@@ -1,4 +1,4 @@
-package org.ngsutils.cmdlinej.exceptions;
+package io.compgen.exceptions;
 
 public class MissingCommandException extends Exception {
 

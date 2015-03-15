@@ -1,11 +1,11 @@
 package org.ngsutils.cmdlinej.test1;
 
 import static org.junit.Assert.fail;
+import io.compgen.MainBuilder;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.ngsutils.cmdlinej.MainBuilder;
 
 public class BazTest {
 
