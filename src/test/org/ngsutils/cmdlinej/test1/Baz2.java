@@ -1,11 +1,10 @@
 package org.ngsutils.cmdlinej.test1;
 
-import io.compgen.Exec;
 import io.compgen.annotation.Command;
 import io.compgen.annotation.UnnamedArg;
 
 @Command(name="baz2", desc="Baz2 description", category="baz")
-public class Baz2 implements Exec {
+public class Baz2 {
 	private String[] s=null;
 	
 	@UnnamedArg()
@@ -13,7 +12,6 @@ public class Baz2 implements Exec {
 		this.s = s;
 	}
 
-	@Override
 	public void exec() throws Exception {
 		assert s!=null;
 		assert s.length==3;

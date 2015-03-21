@@ -1,11 +1,15 @@
 package io.compgen;
 
 import io.compgen.annotation.Command;
+import io.compgen.annotation.Exec;
 import io.compgen.annotation.Option;
 import io.compgen.annotation.UnnamedArg;
 import io.compgen.exceptions.CommandArgumentException;
 import io.compgen.exceptions.MissingCommandException;
+import io.compgen.exceptions.MissingExecException;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
@@ -29,25 +33,38 @@ public class MainBuilder {
 		}
 	}
 
-	private static Map<String, Class<? extends Exec>> execs = new HashMap<String, Class<? extends Exec>>();
+	private static Map<String, Class<?>> execs = new HashMap<String, Class<?>>();
 
 	private String defaultCategory = "General";
 	private String progname = null;
-	private String usage = null;
-	private String version = null;
+	private String defaultUsage = null;
+	private String helpHeader = null;
+	private String helpFooter = null;
 	
+	private String[] categoryOrder = null;
+	
+	public MainBuilder setCategoryOrder(String[] categoryOrder) {
+		this.categoryOrder = categoryOrder;
+		return this;
+	}	
+	
+	public MainBuilder setDefaultUsage(String defaultUsage) {
+		this.defaultUsage = defaultUsage;
+		return this;
+	}
+
 	public MainBuilder setProgName(String progname) {
 		this.progname = progname;
 		return this;
 	}
 
-	public MainBuilder setUsage(String usage) {
-		this.usage = usage;
+	public MainBuilder setHelpHeader(String helpHeader) {
+		this.helpHeader = helpHeader;
 		return this;
 	}
 
-	public MainBuilder setVersion(String version) {
-		this.version = version;
+	public MainBuilder setHelpFooter(String helpFooter) {
+		this.helpFooter = helpFooter;
 		return this;
 	}
 
@@ -57,12 +74,20 @@ public class MainBuilder {
 	}
 
 	
-	public MainBuilder addCommand(Class<? extends Exec> clazz) {
+	public MainBuilder addCommand(Class<?> clazz) throws MissingExecException {
 		String name = clazz.getSimpleName();
 		Command annotation = clazz.getAnnotation(Command.class);
 		if (annotation != null) {
 			name = annotation.name();
+		
 		}
+
+		Method execMethod = findExecMethod(clazz);
+		
+		if (execMethod == null) {
+			throw new MissingExecException("Could not find a valid @Exec method for class: "+clazz.getName());
+		}
+
 		execs.put(name, clazz);
 		return this;
 	}
@@ -73,8 +98,12 @@ public class MainBuilder {
 
 	public void showCommands(OutputStream out) throws MissingCommandException {
 		PrintStream ps = new PrintStream(out);
-		if (usage != null) {
-			ps.println(usage);
+		if (helpHeader != null) {
+			ps.println(helpHeader);
+			ps.println();
+		}
+		if (defaultUsage != null) {
+			ps.println(defaultUsage);
 			ps.println();
 		}
 		ps.println("Available commands:");
@@ -136,16 +165,25 @@ public class MainBuilder {
 			}
 		}
 
-		List<String> cats = new ArrayList<String>(progs.keySet());
-		Collections.sort(cats);
+		List<String> cats = new ArrayList<String>();
+		if (categoryOrder == null) {
+			cats.addAll(progs.keySet());
+			Collections.sort(cats);
+		} else {
+			for (String c: categoryOrder) {
+				cats.add(c);
+			}
+		}
 
 		for (String cat : cats) {
-            ps.println("");
             ps.println("[" + cat + "]");
-			Collections.sort(progs.get(cat));
-			for (String line : progs.get(cat)) {
-				ps.println(line);
-			}
+            if (progs.get(cat) != null) {
+				Collections.sort(progs.get(cat));
+				for (String line : progs.get(cat)) {
+					ps.println(line);
+				}
+            }
+            ps.println("");
 		}
 
 //		spacer = "";
@@ -160,12 +198,11 @@ public class MainBuilder {
 //                + "Display licenses");
 		
         if (hasExperimental) {
-        	ps.println();
         	ps.println("* = experimental command");
-        }
-        if (version != null) {
         	ps.println();
-        	ps.println(version);
+        }
+        if (helpFooter != null) {
+        	ps.println(helpFooter);
         }
     	ps.println();
 	}
@@ -178,29 +215,6 @@ public class MainBuilder {
 		if (!execs.containsKey(cmd)) {
 			throw new MissingCommandException();
 		}
-
-		PrintStream ps = new PrintStream(out);
-		
-		Command command = execs.get(cmd).getAnnotation(Command.class);
-		ps.print(command.name());
-		if (!command.desc().equals("")) {
-			ps.print(" - " + command.desc());
-		}
-		if (!command.doc().equals("")) {
-			ps.println();
-			ps.print(command.doc());
-		}
-		ps.println();
-		ps.print("Usage:" + (progname == null ? "" : " " +progname )+ " "+ command.name() + " [options]");
-		for (Method m: execs.get(cmd).getMethods()) {
-			UnnamedArg uarg = m.getAnnotation(UnnamedArg.class);
-			if (uarg != null) {
-				ps.print(" "+uarg.name());
-			}
-		}
-		ps.println();
-		ps.println();
-		ps.println("Options:");
 
 		SortedMap<String, String> opts = new TreeMap<String, String>();
 		int minsize = 4;
@@ -231,6 +245,39 @@ public class MainBuilder {
 				minsize = minsize > k.length() ? minsize: k.length();
 			}
 		}
+
+		PrintStream ps = new PrintStream(out);
+		
+		if (helpHeader != null) {
+			ps.println(helpHeader);
+			ps.println();
+		}
+		
+		Command command = execs.get(cmd).getAnnotation(Command.class);
+		ps.print(command.name());
+		if (!command.desc().equals("")) {
+			ps.print(" - " + command.desc());
+			ps.println();
+		}
+		if (!command.doc().equals("")) {
+			ps.print(command.doc());
+			ps.println();
+		}
+		ps.println();
+		ps.print("Usage:" + (progname == null ? "" : " " +progname )+ " "+ command.name() + ((opts.size()>0)? " [options]":""));
+		for (Method m: execs.get(cmd).getMethods()) {
+			UnnamedArg uarg = m.getAnnotation(UnnamedArg.class);
+			if (uarg != null) {
+				ps.print(" "+uarg.name());
+			}
+		}
+
+		ps.println();
+
+		if (opts.size() > 0) {
+			ps.println();
+			ps.println("Options:");
+		}
 		
 		for (String k:opts.keySet()) {
 			String spacer = "";
@@ -244,24 +291,42 @@ public class MainBuilder {
 			}
 		}
 		
-		if (version != null) {
+		if (helpFooter != null) {
 			ps.println();
-			ps.println(version);
+			ps.println(helpFooter);
 		}
     	ps.println();
 	}
 
 	public void findAndRun(String[] args) throws Exception {
-		Exec exec = null;
-		List<String> errors = new ArrayList<String>();
-		
-		if (!execs.containsKey(args[0])) {
-			throw new MissingCommandException();
+		if (args.length == 0) {
+			showCommands();
+			return;
+		} else if (args[0].equals("help")) {
+			if (args.length == 1) {
+				showCommands();
+				return;
+			} else if (!execs.containsKey(args[1])) {
+				System.err.println("ERROR: Unknown command: " + args[1]);
+				System.err.println();
+				showCommands();
+				System.exit(1);
+			} else{
+				showCommandHelp(args[1]);
+			}
+			return;
+		} else if (!execs.containsKey(args[0])) {
+			System.err.println("ERROR: Unknown command: " + args[0]);
+			System.err.println();
+			showCommands();
+			System.exit(1);
 		}
-		
-		
-		Class<? extends Exec> clazz = execs.get(args[0]);
-		exec = clazz.newInstance();
+
+		List<String> errors = new ArrayList<String>();
+
+		Class<?> clazz = execs.get(args[0]);
+		Method execMethod = findExecMethod(clazz);
+		Object obj = clazz.newInstance();
 		CmdArgs cmdargs = extractArgs(args, clazz); 
 
 		for (Method m: clazz.getMethods()) {
@@ -291,13 +356,13 @@ public class MainBuilder {
 					if (opt.required()) {
 						errors.add("Missing argument: "+opt.name());
 					} else if (!opt.defaultValue().equals("")) {
-						invokeMethod(exec, m, opt.defaultValue());
+						invokeMethod(obj, m, opt.defaultValue());
 					}
 				} else if (val.equals("")) {
 					// naked option w/o value
-					invokeMethodBoolean(exec, m, true);
+					invokeMethodBoolean(obj, m, true);
 				} else {
-					invokeMethod(exec, m, val);
+					invokeMethod(obj, m, val);
 				}
 				continue;
 			}
@@ -308,39 +373,61 @@ public class MainBuilder {
 					if (unnamed.required()) {
 						errors.add("Missing argument: "+unnamed.name());
 					} else if (!unnamed.defaultValue().equals("")) {
-						invokeMethod(exec, m, unnamed.defaultValue());
+						invokeMethod(obj, m, unnamed.defaultValue());
 					}
 					continue;
 				}
 
 				if (m.getParameterTypes()[0].isArray()) {					
 					String[] ar = (String[]) cmdargs.unnamed.toArray(new String[cmdargs.unnamed.size()]);
-					m.invoke(exec, (Object) ar);
+					m.invoke(obj, (Object) ar);
 				} else if (m.getParameterTypes()[0].equals(List.class)) {
-					m.invoke(exec, Collections.unmodifiableList(cmdargs.unnamed));				
+					m.invoke(obj, Collections.unmodifiableList(cmdargs.unnamed));				
 				} else {
-					invokeMethod(exec, m, cmdargs.unnamed.get(0));
+					invokeMethod(obj, m, cmdargs.unnamed.get(0));
 				}
 			}
 		}
 		
 		if (errors.size() == 0) {
 			try {
-				exec.exec();
-			} catch (CommandArgumentException e) {
-				System.err.println("ERROR: " + e.getMessage());
-				System.err.println();
-				showCommandHelp(args[0]);
-				System.exit(1);
+				if (execMethod != null) {
+					execMethod.invoke(obj);
+				} else {
+					System.err.println("Missing exec method!");
+				}
+			} catch (Exception e) {
+				if (e instanceof CommandArgumentException) {
+					System.err.println("ERROR: " + e.getMessage());
+					System.err.println();
+					showCommandHelp(args[0]);
+					System.exit(1);
+				} else {
+					e.printStackTrace();					
+				}
 			}
 		} else {
 			for (String error: errors) {
-				System.err.println(error);
-				System.err.println();
-				showCommandHelp(args[0]);
-				System.exit(1);
+				System.err.println("ERROR: "+error);
+			}
+			System.err.println();
+			showCommandHelp(args[0]);
+			System.exit(1);
+		}
+	}
+
+	private Method findExecMethod(Class<?> clazz) {
+		Method namedExecMethod = null;
+		for (Method m: clazz.getMethods()) {
+			if (m.getName().equals("exec") && m.getParameterTypes().length == 0) {
+				namedExecMethod = m;
+			}
+			Exec exec = m.getAnnotation(Exec.class);
+			if (exec != null) {
+				return m;
 			}
 		}
+		return namedExecMethod;
 	}
 
 	private boolean isOptionBoolean(Class<?> clazz, String name) {
@@ -383,7 +470,7 @@ public class MainBuilder {
 					cmdargs.put(arg, "");
 					i += 1;
 				}
-			} else if (arg.startsWith("-")) {
+			} else if (arg.startsWith("-") && !arg.equals("-")) {
 				for (int j=1; j<arg.length(); j++) {
 					if (j == arg.length()-1) {
 						if (args.length == i+1 || args[i+1].startsWith("-") || isOptionBoolean(clazz, ""+arg.charAt(j))) {
@@ -397,6 +484,7 @@ public class MainBuilder {
 						}
 					} else {
 						cmdargs.put(""+arg.charAt(j), "");
+						i += 1;
 					}
 				}
 			} else {
@@ -441,4 +529,17 @@ public class MainBuilder {
 		}
 	}
 
+	public static String readFile(String fname) throws IOException {
+		String s = "";
+		InputStream is = MainBuilder.class.getClassLoader().getResourceAsStream(fname);
+		if (is == null) {
+			throw new IOException("Can't load file: "+fname);
+		}
+		int c;
+		while ((c = is.read()) > -1) {
+			s += (char) c;
+		}
+		is.close();
+		return s;
+	}
 }

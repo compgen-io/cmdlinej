@@ -1,11 +1,10 @@
 package org.ngsutils.cmdlinej.test1;
 
-import io.compgen.Exec;
 import io.compgen.annotation.Command;
 import io.compgen.annotation.Option;
 
 @Command(name="foo")
-public class Foo implements Exec {
+public class Foo {
 
 	private String s=null;
 	private int i=-1;
@@ -38,7 +37,6 @@ public class Foo implements Exec {
 		this.intObj = i;
 	}
 
-	@Override
 	public void exec() throws Exception {
 		assert s!=null;
 		assert s.equals("foo");

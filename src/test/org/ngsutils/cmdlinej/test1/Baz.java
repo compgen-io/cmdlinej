@@ -15,7 +15,6 @@ public class Baz extends AbstractCommand {
 		this.s = s;
 	}
 
-	@Override
 	public void exec() throws Exception {
 		assert s!=null;
 		assert s.size()==3;
