@@ -1,4 +1,4 @@
-package io.compgen.exceptions;
+package io.compgen.cmdline.exceptions;
 
 public class ShowHelpException extends Exception {
 

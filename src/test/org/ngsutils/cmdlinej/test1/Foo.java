@@ -1,7 +1,7 @@
 package org.ngsutils.cmdlinej.test1;
 
-import io.compgen.annotation.Command;
-import io.compgen.annotation.Option;
+import io.compgen.cmdline.annotation.Command;
+import io.compgen.cmdline.annotation.Option;
 
 @Command(name="foo")
 public class Foo {

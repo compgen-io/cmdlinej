@@ -1,7 +1,7 @@
 package org.ngsutils.cmdlinej.test1;
 
-import io.compgen.annotation.Command;
-import io.compgen.annotation.UnnamedArg;
+import io.compgen.cmdline.annotation.Command;
+import io.compgen.cmdline.annotation.UnnamedArg;
 
 @Command(name="baz2", desc="Baz2 description", category="baz")
 public class Baz2 {

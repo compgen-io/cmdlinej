@@ -1,8 +1,8 @@
 package org.ngsutils.cmdlinej.test1;
 
 import static org.junit.Assert.fail;
-import io.compgen.MainBuilder;
-import io.compgen.exceptions.MissingCommandException;
+import io.compgen.cmdline.MainBuilder;
+import io.compgen.cmdline.exceptions.MissingCommandException;
 
 import org.junit.After;
 import org.junit.Before;

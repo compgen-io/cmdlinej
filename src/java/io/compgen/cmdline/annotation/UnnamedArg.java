@@ -1,4 +1,4 @@
-package io.compgen.annotation;
+package io.compgen.cmdline.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -7,15 +7,8 @@ import java.lang.annotation.Target;
 
 @Target(value = ElementType.METHOD)
 @Retention(value = RetentionPolicy.RUNTIME)
-public @interface Option {
-	String desc() default "";
-
-	String charName() default "";
-	String name() default "";
-
+public @interface UnnamedArg {
+	String name() default "ARGS";
 	String defaultValue() default "";
-	boolean required() default false;
-	
-	boolean hide() default false;
-	boolean showHelp() default false;
+	boolean required() default true;
 }

@@ -1,8 +1,8 @@
 package org.ngsutils.cmdlinej.test1;
 
-import io.compgen.annotation.Command;
-import io.compgen.annotation.Option;
-import io.compgen.annotation.UnnamedArg;
+import io.compgen.cmdline.annotation.Command;
+import io.compgen.cmdline.annotation.Option;
+import io.compgen.cmdline.annotation.UnnamedArg;
 
 @Command(name="bar", desc="Bar description")
 public class Bar {

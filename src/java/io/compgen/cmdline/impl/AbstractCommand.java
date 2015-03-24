@@ -1,6 +1,6 @@
-package io.compgen.impl;
+package io.compgen.cmdline.impl;
 
-import io.compgen.annotation.Option;
+import io.compgen.cmdline.annotation.Option;
 
 public abstract class AbstractCommand  {
     protected boolean verbose = false;
@@ -9,6 +9,6 @@ public abstract class AbstractCommand  {
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
-    @Option(desc = "Show help", charName = "h")
+    @Option(desc = "Show help", charName = "h", showHelp=true)
     public void showHelp() {}
 }

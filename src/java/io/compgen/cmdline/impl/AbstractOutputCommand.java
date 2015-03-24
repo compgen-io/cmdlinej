@@ -1,6 +1,6 @@
-package io.compgen.impl;
+package io.compgen.cmdline.impl;
 
-import io.compgen.annotation.Option;
+import io.compgen.cmdline.annotation.Option;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;

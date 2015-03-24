@@ -1,7 +1,7 @@
 package org.ngsutils.cmdlinej.test1;
 
 import static org.junit.Assert.fail;
-import io.compgen.MainBuilder;
+import io.compgen.cmdline.MainBuilder;
 
 import org.junit.After;
 import org.junit.Before;

@@ -1,12 +1,12 @@
-package io.compgen;
+package io.compgen.cmdline;
 
-import io.compgen.annotation.Command;
-import io.compgen.annotation.Exec;
-import io.compgen.annotation.Option;
-import io.compgen.annotation.UnnamedArg;
-import io.compgen.exceptions.CommandArgumentException;
-import io.compgen.exceptions.MissingCommandException;
-import io.compgen.exceptions.MissingExecException;
+import io.compgen.cmdline.annotation.Command;
+import io.compgen.cmdline.annotation.Exec;
+import io.compgen.cmdline.annotation.Option;
+import io.compgen.cmdline.annotation.UnnamedArg;
+import io.compgen.cmdline.exceptions.CommandArgumentException;
+import io.compgen.cmdline.exceptions.MissingCommandException;
+import io.compgen.cmdline.exceptions.MissingExecException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -330,12 +330,11 @@ public class MainBuilder {
 		CmdArgs cmdargs = extractArgs(args, clazz); 
 
 		for (Method m: clazz.getMethods()) {
+			if (m.getName().equals("setMainBuilder") && m.getParameterTypes().length == 1 && m.getParameterTypes()[0].equals(MainBuilder.class)) {
+				m.invoke(obj, this);
+			}
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
-				if (opt.showHelp()) {
-					showCommandHelp(args[0]);
-					System.exit(1);
-				}
 				String val = null;
 				if (cmdargs.cmdargs.containsKey(opt.charName())) {
 					val = cmdargs.cmdargs.get(opt.charName());
@@ -350,13 +349,17 @@ public class MainBuilder {
 						val = cmdargs.cmdargs.get(k);
 					}
 				}
+				if (opt.showHelp() && val != null) {
+					showCommandHelp(args[0]);
+					System.exit(1);
+				}
 				
 				if (val == null) {
 					// missing value, try defaults
-					if (opt.required()) {
-						errors.add("Missing argument: "+opt.name());
-					} else if (!opt.defaultValue().equals("")) {
+					if (!opt.defaultValue().equals("")) {
 						invokeMethod(obj, m, opt.defaultValue());
+					} else if (opt.required()) {
+						errors.add("Missing argument: "+opt.name());
 					}
 				} else if (val.equals("")) {
 					// naked option w/o value
