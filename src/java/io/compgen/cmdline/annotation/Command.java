@@ -13,6 +13,7 @@ public @interface Command {
 	String desc() default "";
 	String doc() default "";
 	String category() default "";
+	String footer() default "";
     
     boolean experimental() default false;
     boolean deprecated() default false;

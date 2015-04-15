@@ -14,6 +14,8 @@ public @interface Option {
 	String name() default "";
 
 	String defaultValue() default "";
+	String defaultText() default "";
+	String helpValue() default "";
 	boolean required() default false;
 	
 	boolean hide() default false;

@@ -11,7 +11,7 @@ import java.util.zip.GZIPOutputStream;
 public abstract class AbstractOutputCommand extends AbstractCommand {
     protected OutputStream out = System.out;
 
-    @Option(desc="Output filename (optionally gzip/bzip2 compressed)", charName="o", defaultValue="-", name="output")
+    @Option(desc="Output filename (optionally gzip/bzip2 compressed)", charName="o", defaultValue="-", name="output", helpValue="fname")
     public void setOutputName(String outputName) throws IOException {
         if (outputName.equals("-")) {
             out = System.out;

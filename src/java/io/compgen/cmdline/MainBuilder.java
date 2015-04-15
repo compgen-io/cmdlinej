@@ -32,6 +32,24 @@ public class MainBuilder {
 			this.unnamed = (unnamed == null) ? null: Collections.unmodifiableList(unnamed);
 		}
 	}
+	
+	public class OptionHelp {
+		public final String name;
+		public final String charName;
+		public final String desc;
+		public final boolean isBoolean;
+		public final String helpVal;
+		public OptionHelp(String name, String charName, String desc, boolean isBoolean, String helpVal) {
+			this.name = name;
+			this.charName = charName;
+			this.desc = desc;
+			this.isBoolean = isBoolean;
+			this.helpVal = helpVal;
+		}
+		public int size() {
+			return (name.length() > 0 ? name.length() : charName.length()) + (isBoolean ? 0 : helpVal.length() + 1);
+		}
+	}
 
 	private static Map<String, Class<?>> execs = new HashMap<String, Class<?>>();
 
@@ -216,33 +234,62 @@ public class MainBuilder {
 			throw new MissingCommandException();
 		}
 
-		SortedMap<String, String> opts = new TreeMap<String, String>();
+		SortedMap<String, OptionHelp> opts = new TreeMap<String, OptionHelp>();
 		int minsize = 4;
+		boolean showCharOptions = false;
+		
 		for (Method m: execs.get(cmd).getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
 				String k = "";
-				if (!opt.name().equals("")) {
-					k = opt.name();
-					if (!opt.charName().equals("")) {
-						k += " -"+opt.charName();
-					}
-					k += "  ";
-				} else if (!opt.charName().equals("")) {
-					k = opt.charName() + " ";
-				} else {
-					if (m.getName().startsWith("set")) {
-						k = m.getName().substring(3).toLowerCase() + "  ";
-					} else {
-						k = m.getName().toLowerCase() + "  ";
-					}
-				}
+				String name = "";
+				String charName = "";
 				String desc = opt.desc();
-				if (!opt.defaultValue().equals("")) {
-					desc += " (default: " + opt.defaultValue()+ ")";
+				String helpValue = opt.helpValue();
+				boolean isBoolean = isOptionBoolean(m);
+				boolean isInt = isOptionInteger(m);
+				
+				if (!opt.name().equals("")) {
+					name = opt.name();
+					k = name;
 				}
-				opts.put(k, desc);
-				minsize = minsize > k.length() ? minsize: k.length();
+				
+				if (!opt.charName().equals("")) {
+					charName = opt.charName();
+					showCharOptions = true;
+					if (k.equals("")) {
+						k = charName;
+					}
+				} 
+				
+				if (name.equals("") && charName.equals("")) {
+					if (m.getName().startsWith("set")) {
+						name = m.getName().substring(3).toLowerCase();
+					} else {
+						name = m.getName().toLowerCase();
+					}
+					k = name;
+				}
+								
+				if (!opt.defaultValue().equals("")) {
+					if (opt.defaultText().equals("")) {
+						desc += " (default: " + opt.defaultValue()+ ")";
+					} else {
+						desc += " (default: " + opt.defaultText()+ ")";
+					}
+				}
+				
+				if (helpValue.equals("") && !isBoolean) {
+					if (isInt) {
+						helpValue = "N";
+					} else {
+						helpValue = "val";
+					}
+				}
+				
+				OptionHelp optHelp = new OptionHelp(name, charName, desc, isBoolean, helpValue);
+				opts.put(k, optHelp);
+				minsize = Math.max(minsize, optHelp.size());
 			}
 		}
 
@@ -268,7 +315,11 @@ public class MainBuilder {
 		for (Method m: execs.get(cmd).getMethods()) {
 			UnnamedArg uarg = m.getAnnotation(UnnamedArg.class);
 			if (uarg != null) {
-				ps.print(" "+uarg.name());
+				if (uarg.required()) {
+					ps.print(" "+uarg.name());
+				} else {
+					ps.print(" {"+uarg.name()+"}");
+				}
 			}
 		}
 
@@ -281,14 +332,55 @@ public class MainBuilder {
 		
 		for (String k:opts.keySet()) {
 			String spacer = "";
-			for (int i=k.length(); i<minsize; i++) {
+			OptionHelp optHelp = opts.get(k);
+			for (int i=optHelp.size(); i<minsize; i++) {
 				spacer += " ";
 			}
-			if (k.endsWith("  ")) {
-				ps.println("  --"+k.substring(0,k.length()-2)+spacer+" : "+opts.get(k));
-			} else {
-				ps.println("  -"+k.substring(0,k.length()-1)+spacer+" : "+opts.get(k));
+
+			String s = "  ";
+			
+			if (!optHelp.charName.equals("")) {
+				s += "-" + optHelp.charName;
+				if (!optHelp.name.equals("")) {
+					s += " ";
+				}
+			} else if (showCharOptions) {
+				s += "   ";
 			}
+			
+			if (!optHelp.name.equals("")) {
+				s += "--" + optHelp.name;
+			}
+			
+			if (!optHelp.isBoolean) {
+				s += " " + optHelp.helpVal;
+			}
+			if (optHelp.name.equals("")) {
+				s += "    ";
+			}
+
+			s += spacer + "  : " + optHelp.desc;
+			
+			ps.println(s);
+			
+//			int spacePos = k.indexOf(' ');		
+//			if (k.endsWith("  ")) {
+//				ps.println("     --" + k + spacer + " : " + opts.get(k));
+//			} else if (k.endsWith(" ")) {
+//				ps.println("  -" + k + spacer + "     : " + opts.get(k));
+//			} else if (spacePos > -1) {
+//				String switched = "-" + k.substring(spacePos+1) + " --" + k.substring(0, spacePos);
+//				ps.println("  " + switched + spacer + "   : " + opts.get(k));
+//			} else {
+//				if (k.endsWith(" ")) {
+//					ps.println("  --" + k + spacer + " : " + opts.get(k));
+//				}
+//			}
+		}
+		
+		if (!command.footer().equals("")) {
+			ps.println();
+			ps.println(command.footer());
 		}
 		
 		if (helpFooter != null) {
@@ -405,6 +497,11 @@ public class MainBuilder {
 					System.err.println();
 					showCommandHelp(args[0]);
 					System.exit(1);
+				} else if (e.getCause() != null && e.getCause() instanceof CommandArgumentException) {
+					System.err.println("ERROR: " + e.getCause().getMessage());
+					System.err.println();
+					showCommandHelp(args[0]);
+					System.exit(1);
 				} else {
 					e.printStackTrace();					
 				}
@@ -437,15 +534,44 @@ public class MainBuilder {
 		for (Method m:clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null && (opt.name().equals(name) || opt.charName().equals(name))) {
-				Class<?> param = m.getParameterTypes()[0];
-				if (param.equals(Boolean.class) || param.equals(Boolean.TYPE)) {
-					return true;
-				}
+				return isOptionBoolean(m);
 			}
 		}
 		return false;
 	}
 	
+	private boolean isOptionBoolean(Method m) {
+		if (m.getParameterTypes().length == 0) {
+			return true;
+		} else if (m.getParameterTypes().length == 1) {
+			Class<?> param = m.getParameterTypes()[0];
+			if (param.equals(Boolean.class) || param.equals(Boolean.TYPE)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isOptionInteger(Class<?> clazz, String name) {
+		for (Method m:clazz.getMethods()) {
+			Option opt = m.getAnnotation(Option.class);
+			if (opt != null && (opt.name().equals(name) || opt.charName().equals(name))) {
+				return isOptionInteger(m);
+			}
+		}
+		return false;
+	}
+	
+	private boolean isOptionInteger(Method m) {
+		if (m.getParameterTypes().length > 0) {
+			Class<?> param = m.getParameterTypes()[0];
+			if (param.equals(Integer.class) || param.equals(Integer.TYPE) || param.equals(Long.class) || param.equals(Long.TYPE)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private CmdArgs extractArgs(String[] args, Class<?> clazz) {
 		Map<String, String> cmdargs = new HashMap<String, String>();
 		List<String> unnamed = null;
@@ -460,7 +586,11 @@ public class MainBuilder {
 			}
 			if (arg.startsWith("--")) {
 				if (i+1 < args.length) {
-					if (args[i+1].startsWith("-") || isOptionBoolean(clazz, arg.substring(2))) {
+					if (isOptionInteger(clazz, arg.substring(2))) {
+						cmdargs.put(arg.substring(2), args[i+1]);
+						i += 2;
+						continue;						
+					} else if (args[i+1].startsWith("-") || isOptionBoolean(clazz, arg.substring(2))) {
 						cmdargs.put(arg.substring(2), "");
 						i += 1;
 						continue;
@@ -476,14 +606,18 @@ public class MainBuilder {
 			} else if (arg.startsWith("-") && !arg.equals("-")) {
 				for (int j=1; j<arg.length(); j++) {
 					if (j == arg.length()-1) {
-						if (args.length == i+1 || args[i+1].startsWith("-") || isOptionBoolean(clazz, ""+arg.charAt(j))) {
+						if (isOptionInteger(clazz, ""+arg.charAt(j))) {
+							cmdargs.put(""+arg.charAt(j), args[i+1]);
+							i += 2;
+							break;
+						} else if (args.length >= j || args[i+1].startsWith("-") || isOptionBoolean(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), "");
 							i += 1;
 							continue;
 						} else {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
-							continue;						
+							break;						
 						}
 					} else {
 						cmdargs.put(""+arg.charAt(j), "");
