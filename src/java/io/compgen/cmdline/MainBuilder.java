@@ -418,101 +418,101 @@ public class MainBuilder {
 
 		Class<?> clazz = execs.get(args[0]);
 		Method execMethod = findExecMethod(clazz);
+		if (execMethod == null) {
+			throw new RuntimeException("Missing @Exec method in class: "+clazz.getCanonicalName());
+		}
+
 		Object obj = clazz.newInstance();
 		CmdArgs cmdargs = extractArgs(args, clazz); 
 
-		for (Method m: clazz.getMethods()) {
-			if (m.getName().equals("setMainBuilder") && m.getParameterTypes().length == 1 && m.getParameterTypes()[0].equals(MainBuilder.class)) {
-				m.invoke(obj, this);
-			}
-			Option opt = m.getAnnotation(Option.class);
-			if (opt != null) {
-				String val = null;
-				if (cmdargs.cmdargs.containsKey(opt.charName())) {
-					val = cmdargs.cmdargs.get(opt.charName());
-				} else if (cmdargs.cmdargs.containsKey(opt.name())) {
-					val = cmdargs.cmdargs.get(opt.name());
-				} else {
-					if (m.getName().startsWith("set")) {
-						String k = m.getName().substring(3).toLowerCase();
-						val = cmdargs.cmdargs.get(k);
+		try {
+			for (Method m: clazz.getMethods()) {
+				if (m.getName().equals("setMainBuilder") && m.getParameterTypes().length == 1 && m.getParameterTypes()[0].equals(MainBuilder.class)) {
+					m.invoke(obj, this);
+				}
+				Option opt = m.getAnnotation(Option.class);
+				if (opt != null) {
+					String val = null;
+					if (cmdargs.cmdargs.containsKey(opt.charName())) {
+						val = cmdargs.cmdargs.get(opt.charName());
+					} else if (cmdargs.cmdargs.containsKey(opt.name())) {
+						val = cmdargs.cmdargs.get(opt.name());
 					} else {
-						String k = m.getName().toLowerCase();
-						val = cmdargs.cmdargs.get(k);
+						if (m.getName().startsWith("set")) {
+							String k = m.getName().substring(3).toLowerCase();
+							val = cmdargs.cmdargs.get(k);
+						} else {
+							String k = m.getName().toLowerCase();
+							val = cmdargs.cmdargs.get(k);
+						}
 					}
-				}
-				if (opt.showHelp() && val != null) {
-					showCommandHelp(args[0]);
-					System.exit(1);
-				}
-				
-				if (val == null) {
-					// missing value, try defaults
-					if (!opt.defaultValue().equals("")) {
-						invokeMethod(obj, m, opt.defaultValue());
-					} else if (opt.required()) {
-						errors.add("Missing argument: "+opt.name());
+					if (opt.showHelp() && val != null) {
+						showCommandHelp(args[0]);
+						System.exit(1);
 					}
-				} else if (val.equals("")) {
-					// naked option w/o value
-					invokeMethodBoolean(obj, m, true);
-				} else {
-					invokeMethod(obj, m, val);
-				}
-				continue;
-			}
-			
-			UnnamedArg unnamed = m.getAnnotation(UnnamedArg.class);
-			if (unnamed != null) {
-				if (cmdargs.unnamed == null) {
-					if (unnamed.required()) {
-						errors.add("Missing argument: "+unnamed.name());
-					} else if (!unnamed.defaultValue().equals("")) {
-						invokeMethod(obj, m, unnamed.defaultValue());
+					
+					if (val == null) {
+						// missing value, try defaults
+						if (!opt.defaultValue().equals("")) {
+							invokeMethod(obj, m, opt.defaultValue());
+						} else if (opt.required()) {
+							errors.add("Missing argument: "+opt.name());
+						}
+					} else if (val.equals("")) {
+						// naked option w/o value
+						invokeMethodBoolean(obj, m, true);
+					} else {
+						invokeMethod(obj, m, val);
 					}
 					continue;
 				}
-
-				if (m.getParameterTypes()[0].isArray()) {					
-					String[] ar = (String[]) cmdargs.unnamed.toArray(new String[cmdargs.unnamed.size()]);
-					m.invoke(obj, (Object) ar);
-				} else if (m.getParameterTypes()[0].equals(List.class)) {
-					m.invoke(obj, Collections.unmodifiableList(cmdargs.unnamed));				
-				} else {
-					invokeMethod(obj, m, cmdargs.unnamed.get(0));
+				
+				UnnamedArg unnamed = m.getAnnotation(UnnamedArg.class);
+				if (unnamed != null) {
+					if (cmdargs.unnamed == null) {
+						if (unnamed.required()) {
+							errors.add("Missing argument: "+unnamed.name());
+						} else if (!unnamed.defaultValue().equals("")) {
+							invokeMethod(obj, m, unnamed.defaultValue());
+						}
+						continue;
+					}
+	
+					if (m.getParameterTypes()[0].isArray()) {					
+						String[] ar = (String[]) cmdargs.unnamed.toArray(new String[cmdargs.unnamed.size()]);
+						m.invoke(obj, (Object) ar);
+					} else if (m.getParameterTypes()[0].equals(List.class)) {
+						m.invoke(obj, Collections.unmodifiableList(cmdargs.unnamed));				
+					} else {
+						invokeMethod(obj, m, cmdargs.unnamed.get(0));
+					}
 				}
 			}
-		}
-		
-		if (errors.size() == 0) {
-			try {
-				if (execMethod != null) {
-					execMethod.invoke(obj);
-				} else {
-					System.err.println("Missing exec method!");
+			
+			if (errors.size() == 0) {
+				execMethod.invoke(obj);
+			} else {
+				for (String error: errors) {
+					System.err.println("ERROR: "+error);
 				}
-			} catch (Exception e) {
-				if (e instanceof CommandArgumentException) {
-					System.err.println("ERROR: " + e.getMessage());
-					System.err.println();
-					showCommandHelp(args[0]);
-					System.exit(1);
-				} else if (e.getCause() != null && e.getCause() instanceof CommandArgumentException) {
-					System.err.println("ERROR: " + e.getCause().getMessage());
-					System.err.println();
-					showCommandHelp(args[0]);
-					System.exit(1);
-				} else {
-					e.printStackTrace();					
-				}
+				System.err.println();
+				showCommandHelp(args[0]);
+				System.exit(1);
 			}
-		} else {
-			for (String error: errors) {
-				System.err.println("ERROR: "+error);
+		} catch (Exception e) {
+			if (e instanceof CommandArgumentException) {
+				System.err.println("ERROR: " + e.getMessage());
+				System.err.println();
+				showCommandHelp(args[0]);
+				System.exit(1);
+			} else if (e.getCause() != null && e.getCause() instanceof CommandArgumentException) {
+				System.err.println("ERROR: " + e.getCause().getMessage());
+				System.err.println();
+				showCommandHelp(args[0]);
+				System.exit(1);
+			} else {
+				e.printStackTrace();					
 			}
-			System.err.println();
-			showCommandHelp(args[0]);
-			System.exit(1);
 		}
 	}
 
