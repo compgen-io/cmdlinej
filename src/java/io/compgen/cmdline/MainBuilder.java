@@ -423,8 +423,8 @@ public class MainBuilder {
 		}
 
 		Object obj = clazz.newInstance();
-		CmdArgs cmdargs = extractArgs(args, clazz); 
-
+		CmdArgs cmdargs = extractArgs(args, clazz);
+		
 		try {
 			for (Method m: clazz.getMethods()) {
 				if (m.getName().equals("setMainBuilder") && m.getParameterTypes().length == 1 && m.getParameterTypes()[0].equals(MainBuilder.class)) {
@@ -606,11 +606,12 @@ public class MainBuilder {
 			} else if (arg.startsWith("-") && !arg.equals("-")) {
 				for (int j=1; j<arg.length(); j++) {
 					if (j == arg.length()-1) {
+
 						if (isOptionInteger(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;
-						} else if (args.length >= j || args[i+1].startsWith("-") || isOptionBoolean(clazz, ""+arg.charAt(j))) {
+						} else if ((args.length >= i && args[i+1].startsWith("-")) || isOptionBoolean(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), "");
 							i += 1;
 							continue;

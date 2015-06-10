@@ -11,7 +11,7 @@
 
 	<target name="compile">
         <mkdir dir="${build.dir}/classes"/>
-        <javac srcdir="${src.dir}/java" destdir="${build.dir}/classes" debug="true" debuglevel="lines,vars,source"/>
+        <javac srcdir="${src.dir}/java" destdir="${build.dir}/classes" debug="true" debuglevel="lines,vars,source" target="1.7" source="1.7"/>
     </target>
 
 	<target name="jar" depends="compile, git.revision">
@@ -20,7 +20,10 @@
  		<echo file="${build.dir}/classes/VERSION" message="${ant.project.name}-${version}-${repository.version}"/>
 
 		<mkdir dir="${dist.dir}"/>
-        <jar destfile="${dist.dir}/${ant.project.name}-${version}.jar" basedir="${build.dir}/classes"/>
+        <jar destfile="${dist.dir}/${ant.project.name}-${version}.jar">
+            <fileset dir="${build.dir}/classes"/>
+            <fileset dir="${src.dir}/java" includes="**/*.java"/>
+        </jar>
 	</target>
 
 	<!-- See http://stackoverflow.com/questions/2974106/how-to-lookup-the-latest-git-commit-hash-from-an-ant-build-script -->
