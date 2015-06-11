@@ -511,7 +511,9 @@ public class MainBuilder {
 				showCommandHelp(args[0]);
 				System.exit(1);
 			} else {
+				System.err.println("ERROR: " + e.getMessage());
 				e.printStackTrace();					
+				System.exit(1);
 			}
 		}
 	}
