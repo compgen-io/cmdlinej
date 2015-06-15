@@ -3,6 +3,7 @@ package io.compgen.cmdline;
 import io.compgen.cmdline.annotation.Command;
 import io.compgen.cmdline.annotation.Exec;
 import io.compgen.cmdline.annotation.Option;
+import io.compgen.cmdline.annotation.UnknownArgs;
 import io.compgen.cmdline.annotation.UnnamedArg;
 import io.compgen.cmdline.exceptions.CommandArgumentException;
 import io.compgen.cmdline.exceptions.MissingCommandException;
@@ -26,10 +27,29 @@ public class MainBuilder {
 	public class CmdArgs {
 		public final Map<String, String> cmdargs;
 		public final List<String> unnamed;
+		private List<String> usedArgs = new ArrayList<String>();
 
-		public CmdArgs(Map<String, String> cmdargs, List<String> unnamed) {
+		public CmdArgs(Map<String, String> cmdargs, List<String> unnamed) { //, Map<String, String> unknown) {
 			this.cmdargs = Collections.unmodifiableMap(cmdargs);
 			this.unnamed = (unnamed == null) ? null: Collections.unmodifiableList(unnamed);
+//			this.unknown = Collections.unmodifiableMap(unknown);
+		}
+		
+		public void setArgUsed(String arg) {
+			usedArgs.add(arg);
+		}
+		
+		public List<String[]> getUnusedArgs() {
+			List<String[]> out = new ArrayList<String[]>();
+			
+			for (String k: cmdargs.keySet()) {
+				if (!usedArgs.contains(k)) {
+					String[] kv = new String[] { k, cmdargs.get(k) };
+					out.add(kv);
+				}
+			}
+			
+			return out;
 		}
 	}
 	
@@ -225,6 +245,10 @@ public class MainBuilder {
     	ps.println();
 	}
 
+	public void showCommandHelp(Class<?> clazz) throws MissingCommandException {
+		showCommandHelp(clazz, System.err);
+	}
+
 	public void showCommandHelp(String cmd) throws MissingCommandException {
 		showCommandHelp(cmd, System.err);
 	}
@@ -233,12 +257,16 @@ public class MainBuilder {
 		if (!execs.containsKey(cmd)) {
 			throw new MissingCommandException();
 		}
-
+		Class<?> clazz = execs.get(cmd);
+		showCommandHelp(clazz, out);
+	}
+	
+	public void showCommandHelp(Class<?> clazz, OutputStream out) throws MissingCommandException {
 		SortedMap<String, OptionHelp> opts = new TreeMap<String, OptionHelp>();
 		int minsize = 4;
 		boolean showCharOptions = false;
 		
-		for (Method m: execs.get(cmd).getMethods()) {
+		for (Method m: clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
 				String k = "";
@@ -300,7 +328,7 @@ public class MainBuilder {
 			ps.println();
 		}
 		
-		Command command = execs.get(cmd).getAnnotation(Command.class);
+		Command command = clazz.getAnnotation(Command.class);
 		ps.print(command.name());
 		if (!command.desc().equals("")) {
 			ps.print(" - " + command.desc());
@@ -312,7 +340,7 @@ public class MainBuilder {
 		}
 		ps.println();
 		ps.print("Usage:" + (progname == null ? "" : " " +progname )+ " "+ command.name() + ((opts.size()>0)? " [options]":""));
-		for (Method m: execs.get(cmd).getMethods()) {
+		for (Method m: clazz.getMethods()) {
 			UnnamedArg uarg = m.getAnnotation(UnnamedArg.class);
 			if (uarg != null) {
 				if (uarg.required()) {
@@ -390,6 +418,11 @@ public class MainBuilder {
     	ps.println();
 	}
 
+	public void runClass(Class<?> clazz, String[] args) throws Exception {
+		CmdArgs cmdargs = extractArgs(args, clazz, 0);
+		findAndRunInner(clazz, cmdargs);
+	}
+
 	public void findAndRun(String[] args) throws Exception {
 		if (args.length == 0) {
 			showCommands();
@@ -414,16 +447,20 @@ public class MainBuilder {
 			System.exit(1);
 		}
 
+		Class<?> clazz = execs.get(args[0]);
+		CmdArgs cmdargs = extractArgs(args, clazz);
+		findAndRunInner(clazz, cmdargs);
+	}
+	
+	private void findAndRunInner(Class<?> clazz, CmdArgs cmdargs) throws Exception {
 		List<String> errors = new ArrayList<String>();
 
-		Class<?> clazz = execs.get(args[0]);
 		Method execMethod = findExecMethod(clazz);
 		if (execMethod == null) {
 			throw new RuntimeException("Missing @Exec method in class: "+clazz.getCanonicalName());
 		}
 
 		Object obj = clazz.newInstance();
-		CmdArgs cmdargs = extractArgs(args, clazz);
 		
 		try {
 			for (Method m: clazz.getMethods()) {
@@ -435,19 +472,23 @@ public class MainBuilder {
 					String val = null;
 					if (cmdargs.cmdargs.containsKey(opt.charName())) {
 						val = cmdargs.cmdargs.get(opt.charName());
+						cmdargs.setArgUsed(opt.charName());
 					} else if (cmdargs.cmdargs.containsKey(opt.name())) {
 						val = cmdargs.cmdargs.get(opt.name());
+						cmdargs.setArgUsed(opt.name());
 					} else {
 						if (m.getName().startsWith("set")) {
 							String k = m.getName().substring(3).toLowerCase();
 							val = cmdargs.cmdargs.get(k);
+							cmdargs.setArgUsed(k);
 						} else {
 							String k = m.getName().toLowerCase();
 							val = cmdargs.cmdargs.get(k);
+							cmdargs.setArgUsed(k);
 						}
 					}
 					if (opt.showHelp() && val != null) {
-						showCommandHelp(args[0]);
+						showCommandHelp(clazz);
 						System.exit(1);
 					}
 					
@@ -488,6 +529,15 @@ public class MainBuilder {
 					}
 				}
 			}
+
+			for (Method m: clazz.getMethods()) {
+				UnknownArgs unknown = m.getAnnotation(UnknownArgs.class);
+				if (unknown != null) {
+					for (String[] kv: cmdargs.getUnusedArgs()) {
+						m.invoke(obj, (Object[]) kv);
+					}
+				}
+			}
 			
 			if (errors.size() == 0) {
 				execMethod.invoke(obj);
@@ -496,19 +546,19 @@ public class MainBuilder {
 					System.err.println("ERROR: "+error);
 				}
 				System.err.println();
-				showCommandHelp(args[0]);
+				showCommandHelp(clazz);
 				System.exit(1);
 			}
 		} catch (Exception e) {
 			if (e instanceof CommandArgumentException) {
 				System.err.println("ERROR: " + e.getMessage());
 				System.err.println();
-				showCommandHelp(args[0]);
+				showCommandHelp(clazz);
 				System.exit(1);
 			} else if (e.getCause() != null && e.getCause() instanceof CommandArgumentException) {
 				System.err.println("ERROR: " + e.getCause().getMessage());
 				System.err.println();
-				showCommandHelp(args[0]);
+				showCommandHelp(clazz);
 				System.exit(1);
 			} else {
 				System.err.println("ERROR: " + e.getMessage());
@@ -575,10 +625,13 @@ public class MainBuilder {
 	}
 
 	private CmdArgs extractArgs(String[] args, Class<?> clazz) {
+		return extractArgs(args, clazz, 1);
+	}
+	private CmdArgs extractArgs(String[] args, Class<?> clazz, int startIndex) {
 		Map<String, String> cmdargs = new HashMap<String, String>();
 		List<String> unnamed = null;
 		
-		int i=1;
+		int i=startIndex;
 		while (i < args.length) {
 			String arg = args[i];
 			if (unnamed != null) {
@@ -586,7 +639,10 @@ public class MainBuilder {
 				i++;
 				continue;
 			}
-			if (arg.startsWith("--")) {
+			if (arg.equals("--")) {
+				unnamed = new ArrayList<String>();
+				i++;
+			} else if (arg.startsWith("--")) {
 				if (i+1 < args.length) {
 					if (isOptionInteger(clazz, arg.substring(2))) {
 						cmdargs.put(arg.substring(2), args[i+1]);
@@ -613,21 +669,23 @@ public class MainBuilder {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;
-						} else if ((args.length >= i && args[i+1].startsWith("-")) || isOptionBoolean(clazz, ""+arg.charAt(j))) {
+						} else if ((args.length > (i+1) && args[i+1].startsWith("-")) || isOptionBoolean(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), "");
 							i += 1;
 							continue;
-						} else {
+						} else if (args.length > (i+1)) {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;						
+						} else {
+							cmdargs.put(""+arg.charAt(j), "");
 						}
 					} else {
 						cmdargs.put(""+arg.charAt(j), "");
 						i += 1;
 					}
 				}
-			} else {
+			} else {			
 				unnamed = new ArrayList<String>();
 				unnamed.add(arg);
 				i++;
