@@ -79,6 +79,13 @@ public class MainBuilder {
 	private String helpHeader = null;
 	private String helpFooter = null;
 	
+	private boolean verbose = false;
+	
+	public MainBuilder() {};
+	public MainBuilder(boolean verbose) {
+		this.verbose = verbose;
+	};
+	
 	private String[] categoryOrder = null;
 	
 	public MainBuilder setCategoryOrder(String[] categoryOrder) {
@@ -126,6 +133,10 @@ public class MainBuilder {
 			throw new MissingExecException("Could not find a valid @Exec method for class: "+clazz.getName());
 		}
 
+		if (verbose) {
+			System.err.println("Added command: " + name + " => "+clazz.getName());
+		}
+		
 		execs.put(name, clazz);
 		return this;
 	}
@@ -461,6 +472,16 @@ public class MainBuilder {
 		}
 
 		Object obj = clazz.newInstance();
+		if (verbose) {
+			String val = "";
+			for (String k:cmdargs.cmdargs.keySet()) {
+				if (!val.equals("")) {
+					val+=", ";
+				}
+				val += k;
+			}
+			System.err.println("Valid cmds: "+val);
+		}
 		
 		try {
 			for (Method m: clazz.getMethods()) {
@@ -470,23 +491,36 @@ public class MainBuilder {
 				Option opt = m.getAnnotation(Option.class);
 				if (opt != null) {
 					String val = null;
+					if (verbose) {
+						System.err.println("Option: "+opt.name()+"/"+opt.charName());
+					}
+
 					if (cmdargs.cmdargs.containsKey(opt.charName())) {
 						val = cmdargs.cmdargs.get(opt.charName());
+						if (verbose) {
+							System.err.println("arg: "+opt.charName()+" => "+val);
+						}
 						cmdargs.setArgUsed(opt.charName());
 					} else if (cmdargs.cmdargs.containsKey(opt.name())) {
 						val = cmdargs.cmdargs.get(opt.name());
+						if (verbose) {
+							System.err.println("arg: "+opt.name()+" => "+val);
+						}
 						cmdargs.setArgUsed(opt.name());
 					} else {
+						String k;
 						if (m.getName().startsWith("set")) {
-							String k = m.getName().substring(3).toLowerCase();
-							val = cmdargs.cmdargs.get(k);
-							cmdargs.setArgUsed(k);
+							k = m.getName().substring(3).toLowerCase();
 						} else {
-							String k = m.getName().toLowerCase();
-							val = cmdargs.cmdargs.get(k);
-							cmdargs.setArgUsed(k);
+							k = m.getName().toLowerCase();
 						}
+						val = cmdargs.cmdargs.get(k);
+						if (verbose) {
+							System.err.println("arg: "+k+" => "+val);
+						}
+						cmdargs.setArgUsed(k);
 					}
+
 					if (opt.showHelp() && val != null) {
 						showCommandHelp(clazz);
 						System.exit(1);
@@ -495,6 +529,9 @@ public class MainBuilder {
 					if (val == null) {
 						// missing value, try defaults
 						if (!opt.defaultValue().equals("")) {
+							if (verbose) {
+								System.err.println("arg: "+opt.name()+" => "+opt.defaultValue());
+							}
 							invokeMethod(obj, m, opt.defaultValue());
 						} else if (opt.required()) {
 							errors.add("Missing argument: "+opt.name());
@@ -502,6 +539,9 @@ public class MainBuilder {
 					} else if (val.equals("")) {
 						// naked option w/o value
 						invokeMethodBoolean(obj, m, true);
+						if (verbose) {
+							System.err.println("arg: "+opt.name()+" => "+true);
+						}
 					} else {
 						invokeMethod(obj, m, val);
 					}
@@ -648,6 +688,10 @@ public class MainBuilder {
 						cmdargs.put(arg.substring(2), args[i+1]);
 						i += 2;
 						continue;						
+					} else if (args[i+1].equals("-") && !isOptionBoolean(clazz, arg.substring(2))) {
+						cmdargs.put(arg.substring(2), args[i+1]);
+						i += 2;
+						continue;						
 					} else if (args[i+1].startsWith("-") || isOptionBoolean(clazz, arg.substring(2))) {
 						cmdargs.put(arg.substring(2), "");
 						i += 1;
@@ -669,6 +713,10 @@ public class MainBuilder {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;
+						} else if ((args.length > (i+1) && args[i+1].equals("-")) && !isOptionBoolean(clazz, ""+arg.charAt(j))) {
+							cmdargs.put(""+arg.charAt(j), args[i+1]);
+							i += 2;
+							continue;
 						} else if ((args.length > (i+1) && args[i+1].startsWith("-")) || isOptionBoolean(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), "");
 							i += 1;
@@ -691,11 +739,28 @@ public class MainBuilder {
 				i++;
 			}
 		}
-		
+
+		if (verbose) {
+			for (String arg:cmdargs.keySet()) {
+				System.err.println("["+arg+"] => "+ cmdargs.get(arg));
+			}
+			String val = "";
+			for (String un:unnamed) {
+				if (!val.equals("")) {
+					val+=", ";
+				}
+				val += un;
+			}
+			System.err.println("unnamed => " + val);
+		}
+
 		return new CmdArgs(cmdargs, unnamed);
 	}
 
 	public void invokeMethod(Object obj, Method m, String val) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, CommandArgumentException {
+		if (verbose) {
+			System.err.println("Invoking: "+m.getName() + "("+val+")");
+		}
 		Class<?> param = m.getParameterTypes()[0];
 		if (val == null) {
 			m.invoke(obj, new Object[] {null});
@@ -715,6 +780,9 @@ public class MainBuilder {
 	}
 
 	public void invokeMethodBoolean(Object obj, Method m, boolean val) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, CommandArgumentException {
+		if (verbose) {
+			System.err.println("Invoking: "+m.getName() + "("+val+")");
+		}
 		if (m.getParameterTypes().length == 0) {
 			m.invoke(obj);
 		} else {
