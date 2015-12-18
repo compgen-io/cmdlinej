@@ -1,5 +1,6 @@
 package io.compgen.cmdline.impl;
 
+import io.compgen.cmdline.annotation.Cleanup;
 import io.compgen.cmdline.annotation.Option;
 
 import java.io.BufferedOutputStream;
@@ -22,6 +23,7 @@ public abstract class AbstractOutputCommand extends AbstractCommand {
         }
     }
     
+    @Cleanup
     public void close() throws IOException {
         if (out != System.out) {
             out.close();

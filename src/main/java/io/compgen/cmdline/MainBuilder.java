@@ -1,5 +1,6 @@
 package io.compgen.cmdline;
 
+import io.compgen.cmdline.annotation.Cleanup;
 import io.compgen.cmdline.annotation.Command;
 import io.compgen.cmdline.annotation.Exec;
 import io.compgen.cmdline.annotation.Option;
@@ -581,6 +582,13 @@ public class MainBuilder {
 			
 			if (errors.size() == 0) {
 				execMethod.invoke(obj);
+				for (Method m: clazz.getMethods()) {
+					Cleanup cleanup = m.getAnnotation(Cleanup.class);
+					if (cleanup != null) {
+						m.invoke(obj);
+					}
+				}
+
 			} else {
 				for (String error: errors) {
 					System.err.println("ERROR: "+error);
