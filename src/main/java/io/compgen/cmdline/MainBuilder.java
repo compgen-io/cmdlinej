@@ -9,6 +9,7 @@ import io.compgen.cmdline.annotation.UnnamedArg;
 import io.compgen.cmdline.exceptions.CommandArgumentException;
 import io.compgen.cmdline.exceptions.MissingCommandException;
 import io.compgen.cmdline.exceptions.MissingExecException;
+import io.compgen.cmdline.exceptions.UnknownArgumentException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -630,6 +631,41 @@ public class MainBuilder {
 		return namedExecMethod;
 	}
 
+	private boolean isOptionKnown(Class<?> clazz, String name) {
+		for (Method m:clazz.getMethods()) {
+			Option opt = m.getAnnotation(Option.class);
+			if (opt != null) {
+				if (opt.name().equals(name)) {
+					return true;
+				}
+				String k;
+				if (m.getName().startsWith("set")) {
+					k = m.getName().substring(3).toLowerCase();
+				} else {
+					k = m.getName().toLowerCase();
+				}
+
+				if (k.equals(name)) {
+					return true;
+				}
+				
+			}
+		}
+		return false;
+	}
+
+	private boolean isOptionKnown(Class<?> clazz, char charName) {
+		for (Method m:clazz.getMethods()) {
+			Option opt = m.getAnnotation(Option.class);
+			if (opt != null) {
+				if (opt.charName().equals(charName)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	private boolean isOptionBoolean(Class<?> clazz, String name) {
 		for (Method m:clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
@@ -672,10 +708,10 @@ public class MainBuilder {
 		return false;
 	}
 
-	private CmdArgs extractArgs(String[] args, Class<?> clazz) {
+	private CmdArgs extractArgs(String[] args, Class<?> clazz) throws UnknownArgumentException {
 		return extractArgs(args, clazz, 1);
 	}
-	private CmdArgs extractArgs(String[] args, Class<?> clazz, int startIndex) {
+	private CmdArgs extractArgs(String[] args, Class<?> clazz, int startIndex) throws UnknownArgumentException {
 		Map<String, String> cmdargs = new HashMap<String, String>();
 		List<String> unnamed = null;
 		
@@ -691,7 +727,13 @@ public class MainBuilder {
 				unnamed = new ArrayList<String>();
 				i++;
 			} else if (arg.startsWith("--")) {
+				if (!isOptionKnown(clazz, arg.substring(2))) {
+					throw new UnknownArgumentException(clazz, "Unknown argument: "+ arg);
+				}
 				if (i+1 < args.length) {
+					if (verbose) {
+						System.err.println("arg: " + arg +", is boolean? " + isOptionBoolean(clazz, arg.substring(2)));
+					}
 					if (isOptionInteger(clazz, arg.substring(2))) {
 						cmdargs.put(arg.substring(2), args[i+1]);
 						i += 2;
@@ -715,8 +757,10 @@ public class MainBuilder {
 				}
 			} else if (arg.startsWith("-") && !arg.equals("-")) {
 				for (int j=1; j<arg.length(); j++) {
+					if (!isOptionKnown(clazz, arg.charAt(j))) {
+						throw new UnknownArgumentException(clazz, "Unknown argument: "+ arg);
+					}
 					if (j == arg.length()-1) {
-
 						if (isOptionInteger(clazz, ""+arg.charAt(j))) {
 							cmdargs.put(""+arg.charAt(j), args[i+1]);
 							i += 2;
@@ -753,11 +797,13 @@ public class MainBuilder {
 				System.err.println("["+arg+"] => "+ cmdargs.get(arg));
 			}
 			String val = "";
-			for (String un:unnamed) {
-				if (!val.equals("")) {
-					val+=", ";
+			if (unnamed != null) {
+				for (String un:unnamed) {
+					if (!val.equals("")) {
+						val+=", ";
+					}
+					val += un;
 				}
-				val += un;
 			}
 			System.err.println("unnamed => " + val);
 		}
