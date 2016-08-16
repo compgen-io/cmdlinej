@@ -658,7 +658,7 @@ public class MainBuilder {
 		for (Method m:clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
-				if (opt.charName().equals(charName)) {
+				if (opt.charName().equals(""+charName)) {
 					return true;
 				}
 			}
