@@ -1,4 +1,4 @@
-cmdlinej - Library for setting up and configuring command line programs
+compgen-cmdline - Library for setting up and configuring command line programs
 ========
 
 Using this library and it's annotations will make writing command-line programs in Java 
