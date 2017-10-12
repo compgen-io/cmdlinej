@@ -17,7 +17,9 @@ public @interface Option {
 	String defaultText() default "";
 	String helpValue() default "";
 	boolean required() default false;
-	
+
+	boolean allowMultiple() default false;
+
 	boolean hide() default false;
 	boolean showHelp() default false;
 }

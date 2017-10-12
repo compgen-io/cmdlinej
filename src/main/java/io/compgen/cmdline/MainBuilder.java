@@ -1,16 +1,5 @@
 package io.compgen.cmdline;
 
-import io.compgen.cmdline.annotation.Cleanup;
-import io.compgen.cmdline.annotation.Command;
-import io.compgen.cmdline.annotation.Exec;
-import io.compgen.cmdline.annotation.Option;
-import io.compgen.cmdline.annotation.UnknownArgs;
-import io.compgen.cmdline.annotation.UnnamedArg;
-import io.compgen.cmdline.exceptions.CommandArgumentException;
-import io.compgen.cmdline.exceptions.MissingCommandException;
-import io.compgen.cmdline.exceptions.MissingExecException;
-import io.compgen.cmdline.exceptions.UnknownArgumentException;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,14 +14,65 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import io.compgen.cmdline.annotation.Cleanup;
+import io.compgen.cmdline.annotation.Command;
+import io.compgen.cmdline.annotation.Exec;
+import io.compgen.cmdline.annotation.Option;
+import io.compgen.cmdline.annotation.UnknownArgs;
+import io.compgen.cmdline.annotation.UnnamedArg;
+import io.compgen.cmdline.exceptions.CommandArgumentException;
+import io.compgen.cmdline.exceptions.MissingCommandException;
+import io.compgen.cmdline.exceptions.MissingExecException;
+import io.compgen.cmdline.exceptions.UnknownArgumentException;
+
 public class MainBuilder {
+	public class CmdArgList {
+		protected List<CmdArgValue> arguments = new ArrayList<CmdArgValue>();
+
+		public List<CmdArgValue> getArgValues() {
+			return Collections.unmodifiableList(arguments);
+		}
+		
+		public void add(String arg, String val) {
+			arguments.add(new CmdArgValue(arg, val));
+		}
+
+		public boolean contains(String key) {
+			for (CmdArgValue cav: arguments) {
+				if (cav.arg.equals(key)) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		public List<String> get(String key) {
+			List<String> out = new ArrayList<String>();
+			for (CmdArgValue cav: arguments) {
+				if (cav.arg.equals(key)) {
+					out.add(cav.val);
+				}
+			}
+			return out;
+		}
+		
+	}
+	public class CmdArgValue {
+		public final String arg;
+		public final String val;
+		public CmdArgValue(String arg, String val) {
+			this.arg = arg;
+			this.val = val;
+		}
+	}
+
 	public class CmdArgs {
-		public final Map<String, String> cmdargs;
+		public final CmdArgList cmdargs;
 		public final List<String> unnamed;
 		private List<String> usedArgs = new ArrayList<String>();
 
-		public CmdArgs(Map<String, String> cmdargs, List<String> unnamed) { //, Map<String, String> unknown) {
-			this.cmdargs = Collections.unmodifiableMap(cmdargs);
+		public CmdArgs(CmdArgList cmdargs, List<String> unnamed) { //, Map<String, String> unknown) {
+			this.cmdargs = cmdargs;
 			this.unnamed = (unnamed == null) ? null: Collections.unmodifiableList(unnamed);
 //			this.unknown = Collections.unmodifiableMap(unknown);
 		}
@@ -41,12 +81,14 @@ public class MainBuilder {
 			usedArgs.add(arg);
 		}
 		
+		// Find arguments that are set, but not annotated (will call the @UnknownArgs method)
 		public List<String[]> getUnusedArgs() {
 			List<String[]> out = new ArrayList<String[]>();
 			
-			for (String k: cmdargs.keySet()) {
-				if (!usedArgs.contains(k)) {
-					String[] kv = new String[] { k, cmdargs.get(k) };
+			for (CmdArgValue cav: cmdargs.getArgValues()) {
+				
+				if (!usedArgs.contains(cav.arg)) {
+					String[] kv = new String[] { cav.arg, cav.val };
 					out.add(kv);
 				}
 			}
@@ -436,6 +478,10 @@ public class MainBuilder {
 		findAndRunInner(clazz, cmdargs);
 	}
 
+	public boolean isValidCommand(String cmd) {
+		return execs.containsKey(cmd);
+	}
+	
 	public void findAndRun(String[] args) throws Exception {
 		if (args.length == 0) {
 			showCommands();
@@ -476,13 +522,13 @@ public class MainBuilder {
 		Object obj = clazz.newInstance();
 		if (verbose) {
 			String val = "";
-			for (String k:cmdargs.cmdargs.keySet()) {
+			for (CmdArgValue cav:cmdargs.cmdargs.getArgValues()) {
 				if (!val.equals("")) {
 					val+=", ";
 				}
-				val += k;
+				val += cav.arg;
 			}
-			System.err.println("Valid cmds: "+val);
+			System.err.println("Valid args: "+val);
 		}
 		
 		try {
@@ -490,45 +536,49 @@ public class MainBuilder {
 				if (m.getName().equals("setMainBuilder") && m.getParameterTypes().length == 1 && m.getParameterTypes()[0].equals(MainBuilder.class)) {
 					m.invoke(obj, this);
 				}
+				
+				// for this method, find the appropriate arguments in the cmdArgList
+				
 				Option opt = m.getAnnotation(Option.class);
 				if (opt != null) {
-					String val = null;
+					List<String> vals = null;
 					if (verbose) {
 						System.err.println("Option: "+opt.name()+"/"+opt.charName());
 					}
 
-					if (cmdargs.cmdargs.containsKey(opt.charName())) {
-						val = cmdargs.cmdargs.get(opt.charName());
-						if (verbose) {
-							System.err.println("arg: "+opt.charName()+" => "+val);
-						}
+					if (cmdargs.cmdargs.contains(opt.charName())) {
+						// look for -c charName values
+						vals = cmdargs.cmdargs.get(opt.charName());
 						cmdargs.setArgUsed(opt.charName());
-					} else if (cmdargs.cmdargs.containsKey(opt.name())) {
-						val = cmdargs.cmdargs.get(opt.name());
-						if (verbose) {
-							System.err.println("arg: "+opt.name()+" => "+val);
-						}
+					} else if (cmdargs.cmdargs.contains(opt.name())) {
+						// look for --name values
+						vals = cmdargs.cmdargs.get(opt.name());
 						cmdargs.setArgUsed(opt.name());
 					} else {
+						// look for --methodname values (setMethodName => --methodname)
 						String k;
 						if (m.getName().startsWith("set")) {
 							k = m.getName().substring(3).toLowerCase();
 						} else {
 							k = m.getName().toLowerCase();
 						}
-						val = cmdargs.cmdargs.get(k);
-						if (verbose) {
-							System.err.println("arg: "+k+" => "+val);
+						if (cmdargs.cmdargs.contains(k)) {
+							vals = cmdargs.cmdargs.get(k);
+							cmdargs.setArgUsed(k);
 						}
-						cmdargs.setArgUsed(k);
+					}
+					if (verbose && vals != null) {
+						for (String val: vals) {
+							System.err.println("arg: "+opt.charName()+" => "+ val);
+						}
 					}
 
-					if (opt.showHelp() && val != null) {
+					if (opt.showHelp() && vals != null) {
 						showCommandHelp(clazz);
 						System.exit(1);
 					}
 					
-					if (val == null) {
+					if (vals == null) {
 						// missing value, try defaults
 						if (!opt.defaultValue().equals("")) {
 							if (verbose) {
@@ -538,15 +588,24 @@ public class MainBuilder {
 						} else if (opt.required()) {
 							errors.add("Missing argument: "+opt.name());
 						}
-					} else if (val.equals("")) {
-						// naked option w/o value
-						invokeMethodBoolean(obj, m, true);
-						if (verbose) {
-							System.err.println("arg: "+opt.name()+" => "+true);
-						}
 					} else {
-						invokeMethod(obj, m, val);
+						for (String val: vals) {
+							if (val.equals("")) {
+								// naked option w/o value
+								invokeMethodBoolean(obj, m, true);
+								if (verbose) {
+									System.err.println("arg: "+opt.name()+" => "+true);
+								}
+							} else {
+								invokeMethod(obj, m, val);
+							}
+							if (!opt.allowMultiple()) {
+								break;
+							}
+						}
 					}
+					
+					// we processed this method, so no need to look at unnamed/unknown args
 					continue;
 				}
 				
@@ -712,7 +771,7 @@ public class MainBuilder {
 		return extractArgs(args, clazz, 1);
 	}
 	private CmdArgs extractArgs(String[] args, Class<?> clazz, int startIndex) throws UnknownArgumentException {
-		Map<String, String> cmdargs = new HashMap<String, String>();
+		CmdArgList cmdargs = new CmdArgList();
 		List<String> unnamed = null;
 		
 		int i=startIndex;
@@ -735,24 +794,24 @@ public class MainBuilder {
 						System.err.println("arg: " + arg +", is boolean? " + isOptionBoolean(clazz, arg.substring(2)));
 					}
 					if (isOptionInteger(clazz, arg.substring(2))) {
-						cmdargs.put(arg.substring(2), args[i+1]);
+						cmdargs.add(arg.substring(2), args[i+1]);
 						i += 2;
 						continue;						
 					} else if (args[i+1].equals("-") && !isOptionBoolean(clazz, arg.substring(2))) {
-						cmdargs.put(arg.substring(2), args[i+1]);
+						cmdargs.add(arg.substring(2), args[i+1]);
 						i += 2;
 						continue;						
 					} else if (args[i+1].startsWith("-") || isOptionBoolean(clazz, arg.substring(2))) {
-						cmdargs.put(arg.substring(2), "");
+						cmdargs.add(arg.substring(2), "");
 						i += 1;
 						continue;
 					} else {
-						cmdargs.put(arg.substring(2), args[i+1]);
+						cmdargs.add(arg.substring(2), args[i+1]);
 						i += 2;
 						continue;						
 					}
 				} else {
-					cmdargs.put(arg, "");
+					cmdargs.add(arg, "");
 					i += 1;
 				}
 			} else if (arg.startsWith("-") && !arg.equals("-")) {
@@ -762,26 +821,26 @@ public class MainBuilder {
 					}
 					if (j == arg.length()-1) {
 						if (isOptionInteger(clazz, ""+arg.charAt(j))) {
-							cmdargs.put(""+arg.charAt(j), args[i+1]);
+							cmdargs.add(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;
 						} else if ((args.length > (i+1) && args[i+1].equals("-")) && !isOptionBoolean(clazz, ""+arg.charAt(j))) {
-							cmdargs.put(""+arg.charAt(j), args[i+1]);
+							cmdargs.add(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							continue;
 						} else if ((args.length > (i+1) && args[i+1].startsWith("-")) || isOptionBoolean(clazz, ""+arg.charAt(j))) {
-							cmdargs.put(""+arg.charAt(j), "");
+							cmdargs.add(""+arg.charAt(j), "");
 							i += 1;
 							continue;
 						} else if (args.length > (i+1)) {
-							cmdargs.put(""+arg.charAt(j), args[i+1]);
+							cmdargs.add(""+arg.charAt(j), args[i+1]);
 							i += 2;
 							break;						
 						} else {
-							cmdargs.put(""+arg.charAt(j), "");
+							cmdargs.add(""+arg.charAt(j), "");
 						}
 					} else {
-						cmdargs.put(""+arg.charAt(j), "");
+						cmdargs.add(""+arg.charAt(j), "");
 						i += 1;
 					}
 				}
@@ -793,8 +852,8 @@ public class MainBuilder {
 		}
 
 		if (verbose) {
-			for (String arg:cmdargs.keySet()) {
-				System.err.println("["+arg+"] => "+ cmdargs.get(arg));
+			for (CmdArgValue cav:cmdargs.getArgValues()) {
+				System.err.println("["+cav.arg+"] => "+ cav.val);
 			}
 			String val = "";
 			if (unnamed != null) {
