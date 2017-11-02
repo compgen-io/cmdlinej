@@ -33,6 +33,14 @@ public class CommandArgumentException extends Exception {
 		this.name = null;
 	}
 
+	public CommandArgumentException(Exception e) {
+		super(e);
+		this.method = null;
+		this.value = null;
+		this.clazz = null;
+		this.name = null;
+	}
+
 	/**
 	 * 
 	 */
