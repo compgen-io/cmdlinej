@@ -811,7 +811,7 @@ public class MainBuilder {
 						continue;						
 					}
 				} else {
-					cmdargs.add(arg, "");
+					cmdargs.add(arg.substring(2), "");
 					i += 1;
 				}
 			} else if (arg.startsWith("-") && !arg.equals("-")) {
@@ -880,9 +880,17 @@ public class MainBuilder {
 		} else if (param.equals(String.class)) {
 			m.invoke(obj, val);
 		} else if (param.equals(Integer.class) || param.equals(Integer.TYPE)) {
-			m.invoke(obj, Integer.parseInt(val));
+			if (val.startsWith("0x")) {
+				m.invoke(obj, Integer.parseInt(val.substring(2), 16));				
+			} else {
+				m.invoke(obj, Integer.parseInt(val));
+			}
 		} else if (param.equals(Long.class) || param.equals(Long.TYPE)) {
-			m.invoke(obj, Long.parseLong(val));
+			if (val.startsWith("0x")) {
+				m.invoke(obj, Long.parseLong(val.substring(2), 16));				
+			} else {
+				m.invoke(obj, Long.parseLong(val));
+			}
 		} else if (param.equals(Float.class) || param.equals(Float.TYPE)) {
 			m.invoke(obj, Float.parseFloat(val));
 		} else if (param.equals(Double.class) || param.equals(Double.TYPE)) {
