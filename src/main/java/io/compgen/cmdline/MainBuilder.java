@@ -318,6 +318,7 @@ public class MainBuilder {
 	
 	public void showCommandHelp(Class<?> clazz, OutputStream out) throws MissingCommandException {
 		SortedMap<String, OptionHelp> opts = new TreeMap<String, OptionHelp>();
+		SortedMap<String, OptionHelp> reqOptions = new TreeMap<String, OptionHelp>();
 		int minsize = 4;
 		boolean showCharOptions = false;
 		
@@ -371,7 +372,12 @@ public class MainBuilder {
 				}
 				
 				OptionHelp optHelp = new OptionHelp(name, charName, desc, isBoolean, helpValue);
-				opts.put(k, optHelp);
+				
+				if (opt.required()) {
+					reqOptions.put(k, optHelp);
+				} else {
+					opts.put(k, optHelp);
+				}
 				minsize = Math.max(minsize, optHelp.size());
 			}
 		}
@@ -408,6 +414,45 @@ public class MainBuilder {
 
 		ps.println();
 
+		if (reqOptions.size() > 0) {
+			ps.println();
+			ps.println("Required options:");
+		}
+		
+		for (String k:reqOptions.keySet()) {
+			String spacer = "";
+			OptionHelp optHelp = reqOptions.get(k);
+			for (int i=optHelp.size(); i<minsize; i++) {
+				spacer += " ";
+			}
+
+			String s = "  ";
+			
+			if (!optHelp.charName.equals("")) {
+				s += "-" + optHelp.charName;
+				if (!optHelp.name.equals("")) {
+					s += " ";
+				}
+			} else if (showCharOptions) {
+				s += "   ";
+			}
+			
+			if (!optHelp.name.equals("")) {
+				s += "--" + optHelp.name;
+			}
+			
+			if (!optHelp.isBoolean) {
+				s += " " + optHelp.helpVal;
+			}
+			if (optHelp.name.equals("")) {
+				s += "    ";
+			}
+
+			s += spacer + "  : " + optHelp.desc;
+			
+			ps.println(s);
+			
+		}
 		if (opts.size() > 0) {
 			ps.println();
 			ps.println("Options:");
