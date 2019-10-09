@@ -9,6 +9,6 @@ public abstract class AbstractCommand  {
     public void setVerbose(boolean verbose) {
         this.verbose = verbose;
     }
-    @Option(desc = "Show help", charName = "h", showHelp=true)
+    @Option(desc = "Show help", charName = "h", name="help", showHelp=true)
     public void showHelp() {}
 }
