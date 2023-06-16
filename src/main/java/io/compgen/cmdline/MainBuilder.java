@@ -325,6 +325,9 @@ public class MainBuilder {
 		for (Method m: clazz.getMethods()) {
 			Option opt = m.getAnnotation(Option.class);
 			if (opt != null) {
+				if (opt.hide()) {
+					continue;
+				}
 				String k = "";
 				String name = "";
 				String charName = "";
